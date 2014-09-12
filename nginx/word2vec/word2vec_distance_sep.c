@@ -56,11 +56,15 @@ static word2vec_model_t* get_word2vec_model(char *file_path) {
   }
   for (i = 0; i < model->N; i++) model->bestw[i] = (char *)malloc(model->max_size * sizeof(char));
   model->bi = (long long *)malloc(model->st_size * sizeof(long long));
-  model->vec = (float *)malloc(model->st_size * sizeof(float));
+  model->vec = (float *)malloc(model->max_size * sizeof(float));
+
+  printf("yey\n");
 
   fp = fopen(file_path, "rb");
-  fscanf(fp, "%lld", model->words);
-  fscanf(fp, "%lld", model->size);
+  fscanf(fp, "%d", &(model->words));
+  fscanf(fp, "%d", &(model->size));
+  printf("%I64d:%I64d\n", model->words, model->size);
+
   model->vocab = (char *)malloc((long long)(model->words) * model->max_w * sizeof(char));
   model->M = (float *)malloc((long long)(model->words) * (long long)(model->size) * sizeof(float));
   if (model->M == NULL) {
@@ -155,9 +159,11 @@ long long search_keywords_on_lexicon(word2vec_model_t *model) {
 void make_feature_vector(word2vec_model_t* model) {
   long long a;
   long long b;
+  float f;
   for (b = 0; b < model->cn; b++) {
-    if (model->bi[b] == -1) continue;
-    for (a = 0; a < model->size; a++) model->vec[a] += (model->M)[a + model->bi[b] * model->size];
+    if ((model->bi)[b] == -1) continue;
+    //for (a = 0; a < model->size; a++) (model->vec)[a] += (model->M)[a + (model->bi)[b] * model->size];
+    for (a = 0; a < model->size; a++) (model->vec)[a] += (model->M)[a + (model->bi)[b] * model->size];
   }
   return;
 }
@@ -190,11 +196,11 @@ void insertion_sort(word2vec_model_t* model, long long word_id, float dist) {
   for (a = 0; a < model->N; a++) {
     if (dist > (model->bestd)[a]) {
       for (d = model->N - 1; d > a; d--) {
-        model->bestd[d] = model->bestd[d - 1];
-        model->bestw[d] = model->bestw[d - 1];
+        model->bestd[d] = (model->bestd)[d - 1];
+        strcpy(model->bestw[d], (model->bestw)[d - 1]);
       }
       model->bestd[a] = dist;
-      strcpy(model->bestw[a], &(model->vocab[word_id * model->max_w]));
+      strcpy(model->bestw[a], &(model->vocab)[word_id * model->max_w]);
       break;
     }
   }
@@ -202,59 +208,132 @@ void insertion_sort(word2vec_model_t* model, long long word_id, float dist) {
 }
 
 char* build_json(word2vec_model_t* model) {
-  char *json;
   long long i;
-  size_t is_JSON_COMPACT = 1;
-  json_t *json_root;
-  json_t *word_array = json_array();
-  json_t *dist_array = json_array();
+  char *result;// = (char *)malloc(sizeof(char));
+  json_t *hash, *set, *key, *val, *arr1;
+  //char *tmp;
+  arr1 = json_array();
   for (i = 0; i < model->N; i++) {
-    json_array_append_new(word_array, json_string(model->bestw[i]));
-    json_array_append_new(dist_array, json_real((double)(model->bestd[i])));
+    //printf("%lld\n", i);
+    set = json_object();
+    //val = json_object();
+    //   tmp = (char *)malloc(model->max_size * sizeof(char));
+    //strcpy(tmp, (model->bestw)[i]);
+    val = json_real((model->bestd)[i]);
+    json_object_set(set, (model->bestw)[i], val);
+    json_decref(val);
+    //val = json_real(1.0);
+    json_array_append_new(arr1, set);
+    //    json_array_append_new(arr1, json_integer(1));
+    //json_decref(set);
+
+    //    free(tmp);
   }
-  json_root = json_pack("{soso}", "keyword", word_array , "score", dist_array);
-  json = json_dumps(json_root, is_JSON_COMPACT);
-  json_decref(json_root);
-  json_decref(word_array);
-  json_decref(dist_array);
-  return json;
+  //printf("%s\n", json_dumps(arr1, JSON_INDENT(2)));
+  hash = json_pack("{so}", "result", arr1);
+  result = json_dumps(hash, JSON_INDENT(0));
+    json_decref(arr1);
+
+
+  json_decref(hash);
+
+
+  return result;
 }
 
-int main(int argc, char **argv) {
-  word2vec_model_t *model;
-  char *file_path;
-  char *keyword;
-  long long i;
-  float dist;
-  char *result;
-  if (argc < 2) {
-    printf("you syould set file_path as argvhh\n");
-    return 1;
-  }
-  strcpy(file_path, argv[1]);
-  strcpy(keyword, argv[2]);
-  if ((file_path == NULL) || (file_path == '\0') || (! fexist(file_path))) {
-    printf("You should set file_path which contains word projections in the BINARY FORMAT\n");
-    return 1;
-  }
-  model = get_word2vec_model(file_path);
 
+char* get_similer_word(char *file_path, char *keyword) {
+  char *result;
+  float dist;
+  long long i;
+
+  word2vec_model_t *model = get_word2vec_model(file_path);
   {
+    printf("start init\n");
     init_word2vec_model(model, keyword);
+    printf("end init\n");
+    printf("check query\n");
     if (!strcmp(model->st1, "")) return(0);
+    printf("non null query\n");
+    printf("check phrase num\n");
     if (model->cn < 1) return(0);
+    printf("more than 1 query\n");
+    printf("start serarch lex\n");
     i = search_keywords_on_lexicon(model);
     if (i == -1) return(0);
+
+    printf("end serarch lex\n");
+    printf("start make vector\n");
     make_feature_vector(model);
+    printf("end make vector\n");
+    printf("start normalize vector\n");
+
     normalize_feature_vector(model);
+    printf("end make vector\n");
+    printf("search sim word\n");
+
     for (i = 0; i < model->words; i++) {
       if (does_match_keywords(model, i) == 1) continue;
       dist = get_cosine_distance(model, i);
       insertion_sort(model, i, dist);
     }
-    result = build_json(model);
-    printf("%s\n", result);
-  }
+    //    printf("got sim word\n");
+    printf("get json\n");
+    //while (1) {
+      result = build_json(model);
+      //printf("%s\n", result);
+      //free(result);
 
-  return 0;
+      //}
+
+    printf("got json\n");
+
+  }
+  return result;
+}
+
+
+int main(int argc, char **argv) {
+  char *file_path = "/home/overlast/git/nginx-word2vec-module/data/news_article_both_mecab_dic_20140713.bin";
+  char *keyword = "タモリ";;
+  //  if (argc < 2) {
+  //printf("you syould set file_path as argvhh\n");
+  //    return 1;
+  //}
+  //printf("%s:%s\n", argv[1], argv[2]);
+  //strcpy(file_path, argv[1]);
+  //strcpy(keyword, argv[2]);
+  //printf("%s:%s\n", file_path, keyword);
+
+  //if ((file_path == NULL) || (file_path == '\0') || (! fexist(file_path))) {
+  //  printf("You should set file_path which contains word projections in the BINARY FORMAT\n");
+  // return 1;
+  //}
+
+  //  model = get_word2vec_model(file_path);
+  //{
+  // init_word2vec_model(model, keyword);
+  // if (!strcmp(model->st1, "")) return(0);
+  //
+  //if (model->cn < 1) return(0);
+  //  i = search_keywords_on_lexicon(model);
+  // if (i == -1) return(0);
+  //   imake_feature_vector(model);
+  //  normalize_feature_vector(model);
+  //  for (i = 0; i < model->words; i++) {
+  //    if (does_match_keywords(model, i) == 1) continue;
+  //    dist = get_cosine_distance(model, i);
+  //    insertion_sort(model, i, dist);
+  //  }
+  //  result = build_json(model);
+  char* json =  get_similer_word(file_path, keyword);
+  printf("%s\n", json);
+  free (json);
+
+// }
+
+  //free(file_path);
+  // free(keyword);
+
+  //return 0;
 }
