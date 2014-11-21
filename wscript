@@ -16,6 +16,8 @@ def configure(conf):
   conf.check_cxx(lib = 'msgpack-rpc')
   conf.check_cxx(lib = 'mpio')
   conf.check_cxx(lib = 'msgpack')
+  conf.check_cxx(lib = 'jansson')
+
   conf.env.INSTALL_DIR = "/usr/local/bin"
 
   conf.env.append_value('LINKFLAGS', '-lmsgpack-rpc')
