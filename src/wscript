@@ -1,0 +1,13 @@
+#!/usr/bin/env python
+#-*- coding:utf-8 -*-
+
+def options(opt):
+    opt.load('compiler_c')
+
+def build(bld):
+
+    bld.program(
+        source = 'word2vec-msgpack-rpc-server.cc',
+        target  = 'word2vec-msgpack-rpc-server',
+        install_path = bld.env.INSTALL_DIR,
+    )
