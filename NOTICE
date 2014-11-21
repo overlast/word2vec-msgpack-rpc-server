@@ -1,0 +1,7 @@
+word2vec-msgpack-rpc-server is developed by Toshinori SATO, licensed under Apache License,
+Version 2.0. The original software and related information is available at
+http://github.com/overlast/word2vec-msgpack-rpc-server
+
+Original word2vec is developed by Google, licensed under Apache License,
+Version 2.0. The original software and related information is available at
+https://code.google.com/p/word2vec
