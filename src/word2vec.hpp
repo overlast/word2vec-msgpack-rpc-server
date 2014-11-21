@@ -4,6 +4,10 @@
 #include <malloc.h>
 #include <jansson.h>
 
+// Usage:
+// g++ -g -Wall -O4  ./word2vec-msgpack-rpc-server.cc -o /tmp/sample-msgpack-rpc-server -lmsgpack-rpc -lmpio -lmsgpack -ljansson
+// /tmp/sample-msgpack-rpc-server -m your_word2vec.bin
+
 typedef struct {
   long long max_size;
   long long N;
@@ -46,12 +50,11 @@ static word2vec_model_t* get_word2vec_model(char *file_path) {
   model->bi[0] = -1;
   model->vec = (float *)malloc(model->max_size * sizeof(float));
 
-  printf("yey\n");
-
   fp = fopen(file_path, "rb");
   fscanf(fp, "%lld", &(model->words));
   fscanf(fp, "%lld", &(model->size));
-  printf("%lld:%lld\n", model->words, model->size);
+  printf("[word2vec] read the model file...\n");
+  printf("[word2vec] words in model = %lld, model window size = %lld\n", model->words, model->size);
 
   model->vocab = (char *)malloc((long long)(model->words) * model->max_w * sizeof(char));
   model->M = (float *)malloc((long long)(model->words) * (long long)(model->size) * sizeof(float));
@@ -69,7 +72,25 @@ static word2vec_model_t* get_word2vec_model(char *file_path) {
     for (k = 0; k < model->size; k++) (model->M)[k + j * model->size] /= len;
   }
   fclose(fp);
+  printf("[word2vec] finish to read the model file\n");
+  printf("[word2vec] stand by...\n");
   return model;
+}
+
+void destroy_word2vec_model(word2vec_model_t *model) {
+  long long i = 0;
+  free(model->vec);
+  free(model->bi);
+  for (i = 0; i < model->N; i++) free(model->bestw[i]);
+  for (i = 0; i < model->st_size; i++) {
+    free(model->st[i]);
+  }
+  free(model->bestd);
+  free(model->bestw);
+  free(model->st1);
+  free(model->st);
+  free(model);
+  return;
 }
 
 int fexist(const char *file_path) {
@@ -222,7 +243,6 @@ char* distance(char *file_path, char *keyword) {
   char *result;
   float dist;
   long long i;
-
   word2vec_model_t *model = get_word2vec_model(file_path);
   {
     init_word2vec_model(model, keyword);
@@ -243,6 +263,7 @@ char* distance(char *file_path, char *keyword) {
     printf("[distance : %s] generate JSON\n", keyword);
     result = build_json(model);
   }
+  destroy_word2vec_model(model);
   return result;
 }
 
