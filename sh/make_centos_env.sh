@@ -75,4 +75,7 @@ rm -rf $TMP_DIR
 echo "$SCRIPT_NAME Trying to install waf.."
 sudo yum install -y waf
 
+echo "$SCRIPT_NAME Trying to install waf.."
+sudo yum install -y jansson
+
 echo "$SCRIPT_NAME Finish.."
