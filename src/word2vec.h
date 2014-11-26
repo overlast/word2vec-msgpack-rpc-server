@@ -78,7 +78,15 @@ static word2vec_model_t* get_word2vec_model(char *file_path) {
   }
 
   for (j = 0; j < model->words; j++) {
-    fscanf(fp, "%s%c", &((model->vocab)[j * model->max_w]), &ch);
+
+    k = 0;
+    while (1) {
+      (model->vocab)[j * model->max_w + k] = fgetc(fp);
+      if (feof(fp) || ((model->vocab)[j * model->max_w + k] == ' ')) break;
+      if ((k < model->max_w) && ((model->vocab)[j * model->max_w + k] != '\n')) k++;
+    }
+    (model->vocab)[j * model->max_w + k] = 0;
+
     for (k = 0; k < model->size; k++) fread(&((model->M)[k + j * model->size]), sizeof(float), 1, fp);
     len = 0;
     for (k = 0; k < model->size; k++) len += (model->M)[k + j * model->size] * (model->M)[k + j * model->size];
