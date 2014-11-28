@@ -45,7 +45,6 @@ static word2vec_model_t* get_word2vec_model(char *file_path) {
   long long i, j, k;
   float len;
   FILE *fp;
-  char ch;
 
   model->max_size = 2000; // max length of strings
   model->N = 40; // number of closest words that will be shown
