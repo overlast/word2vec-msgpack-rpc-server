@@ -259,6 +259,16 @@ char* build_json(word2vec_model_t* model) {
   return result;
 }
 
+char* get_null_result(char* keyword) {
+  int res_size = 0;
+  char* res = NULL;
+  res_size += strlen((char *)"{\"result\":[{\"");
+  res_size = strlen(keyword);
+  res_size += strlen((char *)"\": 1.0}]");
+  res = (char*)calloc(res_size + 1, sizeof(char));
+  sprintf(res, "{\"result\":[{\"%s\": 1.0}]", keyword);
+  return res;
+}
 
 char* distance(char *file_path, char *keyword) {
   char *result;
@@ -267,12 +277,18 @@ char* distance(char *file_path, char *keyword) {
   word2vec_model_t *model = get_word2vec_model(file_path);
   {
     init_word2vec_model(model, keyword);
-    if (!strcmp(model->st1, "")) return((char *)"");
+    if (!strcmp(model->st1, "")) {
+      destroy_word2vec_model(model);
+      return get_null_result(keyword);
+    }
     printf("[distance : %s] get keyword\n", keyword);
     if (model->cn < 1) return((char *)"");
     printf("[distance : %s] search\n", keyword);
     i = search_keywords_on_lexicon(model);
-    if (i == -1) return((char *)"");
+    if (i == -1)  {
+      destroy_word2vec_model(model);
+      return get_null_result(keyword);
+    }
     make_feature_vector(model);
     normalize_feature_vector(model);
     printf("[distance : %s] reranking\n", keyword);
@@ -282,6 +298,10 @@ char* distance(char *file_path, char *keyword) {
       insertion_sort(model, i, dist);
     }
     printf("[distance : %s] generate JSON\n", keyword);
+    if (model->bi[0] == -1)  {
+      destroy_word2vec_model(model);
+      return get_null_result(keyword);
+    }
     result = build_json(model);
   }
   destroy_word2vec_model(model);
@@ -294,12 +314,12 @@ char* distance(word2vec_model_t *model, char *keyword) {
   long long i;
 
   init_word2vec_model(model, keyword);
-  if (!strcmp(model->st1, "")) return((char *)"");
+  if (!strcmp(model->st1, "")) return(get_null_result(keyword));
   printf("[distance : %s] get keyword\n", keyword);
   if (model->cn < 1) return((char *)"");
   printf("[distance : %s] search\n", keyword);
   i = search_keywords_on_lexicon(model);
-  if (i == -1) return((char *)"");
+  if (i == -1) return(get_null_result(keyword));
   make_feature_vector(model);
   normalize_feature_vector(model);
   printf("[distance : %s] reranking\n", keyword);
@@ -309,6 +329,7 @@ char* distance(word2vec_model_t *model, char *keyword) {
     insertion_sort(model, i, dist);
   }
   printf("[distance : %s] generate JSON\n", keyword);
+  if (model->bi[0] == -1) return(get_null_result(keyword));
   result = build_json(model);
   return result;
 }
