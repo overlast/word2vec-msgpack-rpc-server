@@ -264,9 +264,9 @@ char* get_null_result(char* keyword) {
   char* res = NULL;
   res_size += strlen((char *)"{\"result\":[{\"");
   res_size += strlen(keyword);
-  res_size += strlen((char *)"\": 1.0}]");
+  res_size += strlen((char *)"\": 1.0}]}");
   res = (char*)calloc(res_size + 1, sizeof(char));
-  sprintf(res, "{\"result\":[{\"%s\": 1.0}]", keyword);
+  sprintf(res, "{\"result\":[{\"%s\": 1.0}]}", keyword);
   return res;
 }
 
