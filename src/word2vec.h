@@ -234,6 +234,7 @@ void insertion_sort(word2vec_model_t* model, long long word_id, float dist) {
   return;
 }
 
+/*
 char* build_json(word2vec_model_t* model) {
   long long i;
   char *result;
@@ -258,16 +259,40 @@ char* build_json(word2vec_model_t* model) {
   json_decref(hash);
   return result;
 }
+*/
+
+char* build_json(word2vec_model_t* model, char* keyword) {
+  long long i;
+  char *result;
+  json_t *hash, *val, *item, *arr1;
+  //char *tmp;
+  arr1 = json_array();
+  if (model->bi[0] != -1) {
+    for (i = 0; i < model->N; i++) {
+      val = json_real((model->bestd)[i]);
+      item = json_pack("{ssso}", "term", (model->bestw)[i], "score", val);
+      json_array_append_new(arr1, item);
+    }
+    hash = json_pack("{sssssosissss}", "format", "json", "query", keyword, "items", arr1, "total_count", (int)model->N, "status", "OK", "sort", "cosine similarity" );
+    result = json_dumps(hash, JSON_INDENT(0));
+  } else {
+    hash = json_pack("{sssssosissss}", "format", "json", "query", keyword, "items", arr1, "total_count", (int)model->N, "status", "NG", "message", "Error: Can't get result using this index term.");
+    result = json_dumps(hash, JSON_INDENT(0));
+  }
+  json_decref(arr1);
+  json_decref(hash);
+  return result;
+}
 
 char* get_null_result(char* keyword, char* status, char* message) {
   int res_size = 0;
   char* res = NULL;
-  res_size += strlen((char *)"{\"query\": \"keyword\", \"items\": [], \"total_count\": 0, \"status\": \"status\", \"message\": \"message\"}");
+  res_size += strlen((char *)"{\"format\": \"json\", \"query\": \"keyword\", \"items\": [], \"total_count\": 0, \"status\": \"status\", \"message\": \"message\"}");
   res_size += strlen(keyword);
   res_size += strlen(status);
   res_size += strlen(message);
   res = (char*)calloc(res_size + 1, sizeof(char));
-  sprintf(res, "{\"query\": \"%s\", \"items\": [], \"total_count\": 0, \"status\": \"%s\", \"message\": \"%s\"}", keyword, status, message);
+  sprintf(res, "{\"format\": \"json\", \"query\": \"%s\", \"items\": [], \"total_count\": 0, \"status\": \"%s\", \"message\": \"%s\"}", keyword, status, message);
   return res;
 }
 
@@ -280,10 +305,13 @@ char* distance(char *file_path, char *keyword) {
     init_word2vec_model(model, keyword);
     if (!strcmp(model->st1, "")) {
       destroy_word2vec_model(model);
-      return get_null_result(keyword, (char*)"NG", (char*)"Error: Model isn't initialized yet.");
+      return get_null_result(keyword, (char*)"OK", (char*)"Length of this query is 0.");
     }
     printf("[distance : %s] get keyword\n", keyword);
-    if (model->cn < 1) return(get_null_result(keyword, (char*)"OK", (char*)"Length of this query is 0."));
+    if (model->cn < 1) {
+      destroy_word2vec_model(model);
+      return get_null_result(keyword, (char*)"NG", (char*)"Error: Can't construct a query vector");
+    }
     printf("[distance : %s] search\n", keyword);
     i = search_keywords_on_lexicon(model);
     if (i == -1)  {
@@ -303,7 +331,7 @@ char* distance(char *file_path, char *keyword) {
       destroy_word2vec_model(model);
       return get_null_result(keyword, (char*)"NG", (char*)"Error: Can't get result using this index term.");
     }
-    result = build_json(model);
+    result = build_json(model, keyword);
   }
   destroy_word2vec_model(model);
   return result;
@@ -315,9 +343,9 @@ char* distance(word2vec_model_t *model, char *keyword) {
   long long i;
 
   init_word2vec_model(model, keyword);
-  if (!strcmp(model->st1, "")) return(get_null_result(keyword, (char*)"NG", (char*)"Error: Model isn't initialized yet."));
+  if (!strcmp(model->st1, "")) return(get_null_result(keyword, (char*)"OK", (char*)"Length of this query is 0."));
   printf("[distance : %s] get keyword\n", keyword);
-  if (model->cn < 1) return(get_null_result(keyword, (char*)"OK", (char*)"Length of this query is 0."));
+  if (model->cn < 1) return(get_null_result(keyword, (char*)"NG", (char*)"Error: Can't construct a query vector"));
   printf("[distance : %s] search\n", keyword);
   i = search_keywords_on_lexicon(model);
   if (i == -1) return(get_null_result(keyword, (char*)"OK", (char*)"This query isn't an index term."));
@@ -331,6 +359,6 @@ char* distance(word2vec_model_t *model, char *keyword) {
   }
   printf("[distance : %s] generate JSON\n", keyword);
   if (model->bi[0] == -1) return(get_null_result(keyword, (char*)"NG", (char*)"Error: Can't get result using this index term."));
-  result = build_json(model);
+  result = build_json(model, keyword);
   return result;
 }
