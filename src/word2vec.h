@@ -259,14 +259,15 @@ char* build_json(word2vec_model_t* model) {
   return result;
 }
 
-char* get_null_result(char* keyword) {
+char* get_null_result(char* keyword, char* status, char* message) {
   int res_size = 0;
   char* res = NULL;
-  res_size += strlen((char *)"{\"result\": [{\"");
+  res_size += strlen((char *)"{\"query\": \"keyword\", \"items\": [], \"total_count\": 0, \"status\": \"status\", \"message\": \"message\"}");
   res_size += strlen(keyword);
-  res_size += strlen((char *)"\": 1.0}]}");
+  res_size += strlen(status);
+  res_size += strlen(message);
   res = (char*)calloc(res_size + 1, sizeof(char));
-  sprintf(res, "{\"result\": [{\"%s\": 1.0}]}", keyword);
+  sprintf(res, "{\"query\": \"%s\", \"items\": [], \"total_count\": 0, \"status\": \"%s\", \"message\": \"%s\"}", keyword, status, message);
   return res;
 }
 
@@ -279,15 +280,15 @@ char* distance(char *file_path, char *keyword) {
     init_word2vec_model(model, keyword);
     if (!strcmp(model->st1, "")) {
       destroy_word2vec_model(model);
-      return get_null_result(keyword);
+      return get_null_result(keyword, "NG", "Error: Model isn't initialized yet.");
     }
     printf("[distance : %s] get keyword\n", keyword);
-    if (model->cn < 1) return((char *)"");
+    if (model->cn < 1) return(get_null_result(keyword, "OK", "Length of this query is 0."));
     printf("[distance : %s] search\n", keyword);
     i = search_keywords_on_lexicon(model);
     if (i == -1)  {
       destroy_word2vec_model(model);
-      return get_null_result(keyword);
+      return get_null_result(keyword, "OK", "This query isn't an index term.");
     }
     make_feature_vector(model);
     normalize_feature_vector(model);
@@ -300,7 +301,7 @@ char* distance(char *file_path, char *keyword) {
     printf("[distance : %s] generate JSON\n", keyword);
     if (model->bi[0] == -1)  {
       destroy_word2vec_model(model);
-      return get_null_result(keyword);
+      return get_null_result(keyword, "NG", "Error: Can't get result using this index term.");
     }
     result = build_json(model);
   }
@@ -314,12 +315,12 @@ char* distance(word2vec_model_t *model, char *keyword) {
   long long i;
 
   init_word2vec_model(model, keyword);
-  if (!strcmp(model->st1, "")) return(get_null_result(keyword));
+  if (!strcmp(model->st1, "")) return(get_null_result(keyword, "NG", "Error: Model isn't initialized yet."));
   printf("[distance : %s] get keyword\n", keyword);
-  if (model->cn < 1) return((char *)"");
+  if (model->cn < 1) return(get_null_result(keyword, "OK", "Length of this query is 0."));
   printf("[distance : %s] search\n", keyword);
   i = search_keywords_on_lexicon(model);
-  if (i == -1) return(get_null_result(keyword));
+  if (i == -1) return(get_null_result(keyword, "OK", "This query isn't an index term."));
   make_feature_vector(model);
   normalize_feature_vector(model);
   printf("[distance : %s] reranking\n", keyword);
@@ -329,7 +330,7 @@ char* distance(word2vec_model_t *model, char *keyword) {
     insertion_sort(model, i, dist);
   }
   printf("[distance : %s] generate JSON\n", keyword);
-  if (model->bi[0] == -1) return(get_null_result(keyword));
+  if (model->bi[0] == -1) return(get_null_result(keyword, "NG", "Error: Can't get result using this index term."));
   result = build_json(model);
   return result;
 }
