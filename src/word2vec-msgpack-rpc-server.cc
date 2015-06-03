@@ -40,8 +40,14 @@ class Word2vecMsgpackRPCServer : public msgpack::rpc::server::base {
     req.result(json);
   }
 
+  void get_analogy(msgpack::rpc::request req, std::string query0, std::string query1, std::string query2) {
+    string json = analogy(model, (char*)query0.c_str(), (char*)query1.c_str(), (char*)query2.c_str());
+    req.result(json);
+  }
+
   /*
-  void analogy(msgpack::rpc::request req, int a1, int a2) {
+
+    void analogy(msgpack::rpc::request req, int a1, int a2) {
   }
   */
 
@@ -54,6 +60,10 @@ class Word2vecMsgpackRPCServer : public msgpack::rpc::server::base {
           msgpack::type::tuple<std::string> params;
           req.params().convert(&params);
           get_distance(req, params.get<0>());
+        } else if(method == "analogy") {
+          msgpack::type::tuple<std::string, std::string, std::string> params;
+          req.params().convert(&params);
+          get_analogy(req, params.get<0>(), params.get<1>(), params.get<2>());
         } else {
           req.error(msgpack::rpc::NO_METHOD_ERROR);
         }
