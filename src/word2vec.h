@@ -14,6 +14,7 @@
 
 #include <stdio.h>
 #include <string.h>
+#include <stdlib.h>
 #include <math.h>
 #include <malloc.h>
 #include <jansson.h>
@@ -143,11 +144,8 @@ void make_keyword_vector (word2vec_model_t *model) {
   return;
 }
 
-void set_keyword (word2vec_model_t *model, char **keywords) {
-
+void set_keyword (word2vec_model_t *model, char **keywords, int keyword_num) {
   long long i = 0;
-  int keyword_num = sizeof(keywords)/sizeof(char**);
-
   for (int j = 0; j < keyword_num; j++) {
     int k = 0;
     while (1) {
@@ -167,6 +165,7 @@ void set_keyword (word2vec_model_t *model, char **keywords) {
         }
         break;
       }
+      k++;
       i++;
     }
     if (i >= (model->max_size - 1)) {
@@ -174,23 +173,21 @@ void set_keyword (word2vec_model_t *model, char **keywords) {
     }
   }
   return;
-
 }
 
-void set_keyword_vector (word2vec_model_t *model, char **keywords) {
-  set_keyword(model, keywords);
+void set_keyword_vector (word2vec_model_t *model, char **keywords, int keyword_num) {
+  set_keyword(model, keywords, keyword_num);
   make_keyword_vector(model);
   return;
-
 }
 
-void init_word2vec_model (word2vec_model_t *model, char **keywords) {
+void init_word2vec_model (word2vec_model_t *model, char **keywords, int keyword_num) {
 
   long long i = 0;
   for (i = 0; i < model->N; i++) model->bestd[i] = 0;
   for (i = 0; i < model->N; i++) model->bestw[i][0] = 0;
   for (i = 0; i < model->max_size; i++) model->st1[i] = '\0';
-  set_keyword_vector(model, keywords);
+  set_keyword_vector(model, keywords, keyword_num);
   for (i = 0; i < model->size; i++) model->vec[i] = 0;
   return;
 
@@ -333,10 +330,11 @@ char* distance(char *file_path, char *keyword) {
   long long i;
   word2vec_model_t *model = get_word2vec_model(file_path);
 
-  char** keywords = (char**)malloc(sizeof(char*) * 1);
+  int keyword_num = 1;
+  char** keywords = (char**)malloc(sizeof(char*) * keyword_num);
   keywords[0] = keyword;
 
-  init_word2vec_model(model, keywords);
+  init_word2vec_model(model, keywords, keyword_num);
   free(keywords);
 
   {
@@ -379,10 +377,11 @@ char* distance(word2vec_model_t *model, char *keyword) {
   float dist;
   long long i;
 
-  char** keywords = (char**)malloc(sizeof(char*) * 1);
+  int keyword_num = 1;
+  char** keywords = (char**)malloc(sizeof(char*) * keyword_num);
   keywords[0] = keyword;
 
-  init_word2vec_model(model, keywords);
+  init_word2vec_model(model, keywords, keyword_num);
   free(keywords);
 
   if (!strcmp(model->st1, "")) return(get_null_result(keyword, (char*)"OK", (char*)"Length of this query is 0."));
@@ -411,33 +410,45 @@ char* analogy(char *file_path, char *keyword0, char *keyword1, char *keyword2) {
   long long i;
   word2vec_model_t *model = get_word2vec_model(file_path);
 
-  char** keywords = (char**)malloc(sizeof(char*) * 3);
+  int query_str_size = strlen(keyword0) + strlen(keyword1) + strlen(keyword2) + 3;
+  char* query_str = (char*)malloc(sizeof(char) * query_str_size);
+  int keyword_num = 3;
+  char** keywords = (char**)malloc(sizeof(char*) * keyword_num);
+
+  snprintf(query_str, query_str_size, "%s %s %s", keyword0, keyword1, keyword2);
+
   keywords[0] = keyword0;
   keywords[1] = keyword1;
-  keywords[1] = keyword2;
+  keywords[2] = keyword2;
 
-  init_word2vec_model(model, keywords);
+  init_word2vec_model(model, keywords, keyword_num);
   free(keywords);
 
   {
     if (!strcmp(model->st1, "")) {
       destroy_word2vec_model(model);
-      return get_null_result(keyword0, (char*)"OK", (char*)"Length of this query is 0.");
+      result = get_null_result(query_str, (char*)"OK", (char*)"Length of this query is 0.");
+      free(query_str);
+      return result;
     }
-    printf("[distance : %s] get keyword\n", keyword0);
-    if (model->cn < 1) {
+    printf("[analogy : %s] get keyword\n", keyword0);
+    if (model->cn < 3) {
       destroy_word2vec_model(model);
-      return get_null_result(keyword0, (char*)"NG", (char*)"Error: Can't construct a query vector");
+      get_null_result(query_str, (char*)"NG", (char*)"Error: Can't construct a query vector");
+      free(query_str);
+      return result;
     }
-    printf("[distance : %s] search\n", keyword0);
+    printf("[analogy : %s] search\n", keyword0);
     i = search_keywords_on_lexicon(model);
     if (i == -1)  {
       destroy_word2vec_model(model);
-      return get_null_result(keyword0, (char*)"OK", (char*)"This query isn't an index term.");
+      result = get_null_result(query_str, (char*)"OK", (char*)"This query isn't an index term.");
+      free(query_str);
+      return result;
     }
     make_analogy_feature_vector(model);
     normalize_feature_vector(model);
-    printf("[distance : %s] reranking\n", keyword0);
+    printf("[analogy : %s] reranking\n", keyword0);
     for (i = 0; i < model->words; i++) {
       if (i == (model->bi)[0]) continue;
       if (i == (model->bi)[1]) continue;
@@ -446,10 +457,12 @@ char* analogy(char *file_path, char *keyword0, char *keyword1, char *keyword2) {
       dist = get_cosine_distance(model, i);
       insertion_sort(model, i, dist);
     }
-    printf("[distance : %s] generate JSON\n", keyword0);
+    printf("[analogy : %s] generate JSON\n", keyword0);
     if (model->bi[0] == -1)  {
       destroy_word2vec_model(model);
-      return get_null_result(keyword0, (char*)"NG", (char*)"Error: Can't get result using this index term.");
+      result = get_null_result(query_str, (char*)"NG", (char*)"Error: Can't get result using this index term.");
+      free(query_str);
+      return result;
     }
     result = build_json(model, keyword0);
   }
@@ -462,23 +475,45 @@ char* analogy(word2vec_model_t *model, char *keyword0, char *keyword1, char *key
   float dist;
   long long i;
 
-  char** keywords = (char**)malloc(sizeof(char*) * 3);
+  int query_str_size = strlen(keyword0) + strlen(keyword1) + strlen(keyword2) + 3;
+  char* query_str = (char*)malloc(sizeof(char) * query_str_size);
+  int keyword_num = 3;
+  char** keywords = (char**)malloc(sizeof(char*) * keyword_num);
+
+  snprintf(query_str, query_str_size, "%s %s %s", keyword0, keyword1, keyword2);
+
   keywords[0] = keyword0;
   keywords[1] = keyword1;
   keywords[2] = keyword2;
 
-  init_word2vec_model(model, keywords);
+  init_word2vec_model(model, keywords, keyword_num);
   free(keywords);
 
-  if (!strcmp(model->st1, "")) return(get_null_result(keyword0, (char*)"OK", (char*)"Length of this query is 0."));
-  printf("[distance : %s] get keyword\n", keyword0);
-  if (model->cn < 3) return(get_null_result(keyword0, (char*)"NG", (char*)"Error: Can't construct a query vector"));
-  printf("[distance : %s] search\n", keyword0);
+  if (!strcmp(model->st1, "")) {
+    result = get_null_result(query_str, (char*)"OK", (char*)"Length of this query is 0.");
+    free(query_str);
+    return result;
+  }
+
+  printf("[analogy : %s] get keyword\n", query_str);
+
+  if (model->cn < 3) {
+    get_null_result(query_str, (char*)"NG", (char*)"Error: Can't construct a query vector");
+    free(query_str);
+    return result;
+  }
+
+  printf("[analogy : %s] search\n", query_str);
   i = search_keywords_on_lexicon(model);
-  if (i == -1) return(get_null_result(keyword0, (char*)"OK", (char*)"This query isn't an index term."));
+
+  if (i == -1) {
+    result = get_null_result(query_str, (char*)"OK", (char*)"This query isn't an index term.");
+    free(query_str);
+    return result;
+  }
   make_analogy_feature_vector(model);
   normalize_feature_vector(model);
-  printf("[distance : %s] reranking\n", keyword0);
+  printf("[analogy : %s] reranking\n", query_str);
 
   for (i = 0; i < model->words; i++) {
     if (i == (model->bi)[0]) continue;
@@ -489,8 +524,17 @@ char* analogy(word2vec_model_t *model, char *keyword0, char *keyword1, char *key
     insertion_sort(model, i, dist);
   }
 
-  printf("[distance : %s] generate JSON\n", keyword0);
-  if (model->bi[0] == -1) return(get_null_result(keyword0, (char*)"NG", (char*)"Error: Can't get result using this index term."));
-  result = build_json(model, keyword0);
+  printf("[analogy : %s] generate JSON\n", query_str);
+
+  if (model->bi[0] == -1) {
+    result = get_null_result(query_str, (char*)"NG", (char*)"Error: Can't get result using this index term.");
+    free(query_str);
+    return result;o
+  }
+
+  result = build_json(model, query_str);
+
+  free(query_str);
+
   return result;
 }
