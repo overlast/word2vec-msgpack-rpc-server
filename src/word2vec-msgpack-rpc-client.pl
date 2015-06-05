@@ -14,7 +14,7 @@ my $client = mprpc_client '0.0.0.0', '22676';
 }
 
 {
-    my $a = $client->call( analogy => ["LINE", "渋谷", "はてな"] );
+    my $a = $client->call( analogy => ["原宿", "クレープ", "京都"] );
     my $res = $a->recv;
     print Dump $res;
 }
