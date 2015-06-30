@@ -5,12 +5,12 @@ APPNAME = 'word2vec-msgpack-rpc-server'
 VERSION = '0.0.1'
 
 def options(opt):
-  opt.load('compiler_cc')
+  opt.load('compiler_c')
   opt.load('compiler_cxx')
 
 def configure(conf):
   conf.env.CXXFLAGS += ['-O3', '-Wall', '-g']
-  conf.load('compiler_cc')
+  conf.load('compiler_c')
   conf.load('compiler_cxx')
 
   conf.check_cxx(lib = 'msgpack-rpc')
